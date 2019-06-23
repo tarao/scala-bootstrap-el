@@ -24,7 +24,8 @@
 
 ;;; Code:
 
-(require 'json)
+(require 'json)   ;; json-read
+(require 'subr-x) ;; string-remove-prefix
 
 (defgroup scala-bootstrap nil
   "Installer of Scala tools"
