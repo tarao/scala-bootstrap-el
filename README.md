@@ -11,7 +11,7 @@ if you are using [lsp-mode][].
 
 ```elisp
 (require 'scala-bootstrap)
-(require 'lsp)
+(require 'lsp-mode)
 
 (add-hook 'scala-mode-hook
           '(lambda ()
