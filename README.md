@@ -56,8 +56,8 @@ appear in `*bloop-server*` buffer.
 This macro also ensures that [Bloop][] is installed before starting a
 server.
 
-Funcitions
-----------
+Interactive Functions
+---------------------
 
 ### `scala-bootstrap:reinstall-metals` ()
 
