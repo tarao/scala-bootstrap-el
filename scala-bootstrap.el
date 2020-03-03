@@ -150,7 +150,7 @@
                        "--java-opt" "-Dmetals.client=emacs"
                        artifact
                        "-r" "bintray:scalacenter/releases"
-                       "-r" "sonatype:snapshots"
+                       "-r" "sonatype:releases"
                        "-o" output "-f")
                  `(lambda (&rest args) (funcall ',callback)))))))
       (if scala-bootstrap:metals-version
