@@ -48,19 +48,10 @@
   :type '(choice (const :tag "latest" nil) string)
   :group 'scala-bootstrap)
 
-(defcustom scala-bootstrap:bloop-version nil
-  "Bloop version to install."
-  :type '(choice (const :tag "latest" nil) string)
-  :group 'scala-bootstrap)
-
 (defconst scala-bootstrap-metals-artifact-template
   "org.scalameta:metals_%s:%s")
 (defconst scala-bootstrap-metals-releases-api
   "https://api.github.com/repos/scalameta/metals/releases/latest")
-(defconst scala-bootstrap-bloop-installer-url-template
-  "https://github.com/scalacenter/bloop/releases/download/%s/install.py")
-(defconst scala-bootstrap-bloop-releases-api
-  "https://api.github.com/repos/scalacenter/bloop/releases/latest")
 
 (defun scala-bootstrap-enable-bin-directory ()
   (let ((dir scala-bootstrap:bin-directory))
@@ -97,7 +88,7 @@
        "install-coursier"
        (list "curl" "-vL" "-o"
              (shell-quote-argument output)
-             "https://git.io/coursier")
+             "https://git.io/coursier-cli-linux")
        `(lambda (&rest args)
           (call-process-shell-command
            (format "chmod a+x %s" (shell-quote-argument ,output)))
@@ -167,36 +158,6 @@
 
 ;; bloop
 
-(defun scala-bootstrap-parse-bloop-installer-from-json (json)
-  (let* ((assets (gethash "assets" json))
-         (download-urls (mapcar #'(lambda (asset)
-                                    (gethash "browser_download_url" asset))
-                                assets)))
-    (car-safe
-     (seq-filter (lambda (s)
-                   (string-suffix-p "/install.py" s))
-                 download-urls))))
-
-(defun scala-bootstrap-async-bloop-latest-version (callback)
-  (scala-bootstrap-async-command
-   "install-bloop"
-   (list "curl" "-sL" scala-bootstrap-bloop-releases-api)
-   `(lambda (proc)
-      (let* ((buf (process-buffer proc))
-             (installer
-              (with-current-buffer (prog1 buf
-                                     (unless (buffer-live-p buf)
-                                       (error "No response buffer")))
-                (save-excursion
-                  (goto-char (point-min))
-                  (let* ((json-object-type 'hash-table)
-                         (json-array-type 'list)
-                         (json-key-type 'string)
-                         (json (ignore-errors (json-read))))
-                    (scala-bootstrap-parse-bloop-installer-from-json json))))))
-        (message "The latest installer of bloop: %s" installer)
-        (funcall ',callback installer)))))
-
 (defun scala-bootstrap-bloop-binary ()
   (expand-file-name "bloop" scala-bootstrap:bin-directory))
 
@@ -204,31 +165,12 @@
 (defun scala-bootstrap:maybe-async-install-bloop (callback)
   (if (executable-find "bloop")
       (funcall callback)
-    (let ((install-fun
-           `(lambda (installer-url)
-              (let* ((callback ',callback)
-                     (output (scala-bootstrap-bloop-binary))
-                     (dest scala-bootstrap:bin-directory)
-                     (cmds (list
-                            (format "curl -sL %s"
-                                    (shell-quote-argument installer-url))
-                            (format "python - --dest %s"
-                                    (shell-quote-argument dest))))
-                     (shell-cmd (mapconcat #'identity cmds " | ")))
-                (message "Install bloop to %s" output)
-                (scala-bootstrap-async-command
-                 "install-bloop"
-                 (list shell-file-name shell-command-switch shell-cmd)
-                 `(lambda (&rest args) (funcall ',callback)))))))
-      (if scala-bootstrap:bloop-version
-          (let ((version
-                 (if (string-prefix-p "v" scala-bootstrap:bloop-version)
-                     scala-bootstrap:bloop-version
-                   (concat "v" scala-bootstrap:bloop-version))))
-            (funcall install-fun
-                     (format scala-bootstrap-bloop-installer-url-template
-                             version)))
-        (scala-bootstrap-async-bloop-latest-version install-fun)))))
+    (let ((output scala-bootstrap:bin-directory))
+      (message "Install bloop to %s" (scala-bootstrap-bloop-binary))
+      (scala-bootstrap-async-command
+       "install-bloop"
+       (list "coursier" "install" "bloop" "--only-prebuilt=true" "--dir" output)
+       `(lambda (&rest args) (funcall ',callback))))))
 
 ;;;###autoload
 (defun scala-bootstrap:reinstall-bloop ()
@@ -281,10 +223,13 @@ Bloop will be installed.  Otherwise, the latest version will be
 installed."
   `(let ((buf (current-buffer)) (body ',body))
      (scala-bootstrap-enable-bin-directory)
-     (scala-bootstrap:maybe-async-install-bloop
+     (scala-bootstrap:maybe-async-install-coursier
       `(lambda ()
-         (with-current-buffer ,buf
-           ,@body)))))
+         (let ((buf ,buf) (body ',body))
+           (scala-bootstrap:maybe-async-install-bloop
+            `(lambda ()
+               (with-current-buffer ,buf
+                 ,@body))))))))
 
 ;;;###autoload
 (defmacro scala-bootstrap:with-bloop-server-started (&rest body)
